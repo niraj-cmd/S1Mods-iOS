@@ -1,0 +1,55 @@
+workflows:
+  ios-build:
+    name: iOS Build
+    instance_type: mac_mini_m1
+    max_build_duration: 30
+    environment:
+      ios_signing:
+        distribution_type: development
+      vars:
+        BUNDLE_ID: "com.asjohn720.s1mods"
+    scripts:
+      - name: Install dependencies
+        script: |
+          cd S1Mods
+      - name: Create export options
+        script: |
+          cd S1Mods
+          cat > exportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>development</string>
+            <key>teamID</key>
+            <string>$CM_TEAM_ID</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>compileBitcode</key>
+            <false/>
+          </dict>
+          </plist>
+          EOF
+      - name: Build IPA
+        script: |
+          cd S1Mods
+          xcodebuild -project S1Mods.xcodeproj \
+            -scheme S1Mods \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath build/S1Mods.xcarchive \
+            CODE_SIGN_STYLE=Automatic \
+            archive
+          xcodebuild -exportArchive \
+            -archivePath build/S1Mods.xcarchive \
+            -exportPath build/ipa \
+            -exportOptionsPlist exportOptions.plist
+    artifacts:
+      - build/ipa/S1Mods.ipa
+    publishing:
+      email:
+        recipients:
+          - $CM_BUILD_EMAIL
