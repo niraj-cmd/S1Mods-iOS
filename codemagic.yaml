@@ -6,6 +6,7 @@ workflows:
     environment:
       ios_signing:
         distribution_type: development
+        bundle_identifier: "com.asjohn720.s1mods"
       vars:
         BUNDLE_ID: "com.asjohn720.s1mods"
     scripts:
@@ -39,7 +40,7 @@ workflows:
           xcodebuild -project S1Mods.xcodeproj \
             -scheme S1Mods \
             -configuration Release \
-            -destination "generic/platform=iOS" \
+            -destination "generic/platform/iOS" \
             -archivePath build/S1Mods.xcarchive \
             CODE_SIGN_STYLE=Automatic \
             archive
