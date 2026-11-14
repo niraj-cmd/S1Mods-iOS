@@ -1,4 +1,4 @@
-name: Build iOS IPA
+name: Build iOS App
 
 on:
   push:
@@ -7,9 +7,12 @@ on:
 
 jobs:
   build:
-    name: Build S1Mods IPA
+    name: Build iOS IPA
     runs-on: macos-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -18,13 +21,23 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
+      - name: Setup App Store Connect API
+        if: env.APP_STORE_CONNECT_ISSUER_ID != ''
+        run: |
+          mkdir -p ~/private_keys
+          echo "${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}" > ~/private_keys/AuthKey.p8
+          chmod 600 ~/private_keys/AuthKey.p8
+
       - name: Build IPA
         working-directory: ./S1Mods
         env:
-          DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+          APP_STORE_CONNECT_PRIVATE_KEY_PATH: ~/private_keys/AuthKey.p8
+          BUNDLE_ID: com.nirajashtaputre.s1mods
         run: |
-          # Create export options with team ID from secrets
-          cat > exportOptions.plist << EOFO
+          # Create export options
+          cat > exportOptions.plist << EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -32,7 +45,7 @@ jobs:
             <key>method</key>
             <string>development</string>
             <key>teamID</key>
-            <string>${{ secrets.DEVELOPMENT_TEAM }}</string>
+            <string>${TEAM_ID}</string>
             <key>signingStyle</key>
             <string>automatic</string>
             <key>stripSwiftSymbols</key>
@@ -41,18 +54,15 @@ jobs:
             <false/>
           </dict>
           </plist>
-          EOFO
-
-          echo "Building with team: ${{ secrets.DEVELOPMENT_TEAM }}"
+          EOF
 
           # Archive
           xcodebuild -project S1Mods.xcodeproj \
             -scheme S1Mods \
             -configuration Release \
-            -destination "generic/platform=iOS" \
+            -destination "generic/platform/iOS" \
             -archivePath build/S1Mods.xcarchive \
             CODE_SIGN_STYLE=Automatic \
-            DEVELOPMENT_TEAM="${{ secrets.DEVELOPMENT_TEAM }}" \
             archive
 
           # Export IPA
@@ -61,19 +71,16 @@ jobs:
             -exportPath build/ipa \
             -exportOptionsPlist exportOptions.plist
 
-          # Copy to root for artifact
-          cp build/ipa/S1Mods.ipa ./S1Mods.ipa
-
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: S1Mods-ipa
-          path: S1Mods/S1Mods.ipa
+          path: S1Mods/build/ipa/S1Mods.ipa
           retention-days: 30
 
       - name: Create Release (on tag)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: S1Mods/S1Mods.ipa
+          files: S1Mods/build/ipa/S1Mods.ipa
           generate_release_notes: true
